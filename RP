@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+
+import pynotify
+import urllib2
+import tempfile
+import subprocess
+import os
+
+def show_current(text, subtext, imgurl):
+    img = urllib2.urlopen(imgurl).read() #TODO: check for errors
+    tmpfile = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) #ditto
+    tmpfile.write(img)
+    tmpfile.close()
+
+    notif = pynotify.Notification(text, subtext, tmpfile.name)
+    notif.set_timeout(3500)
+    notif.show()
+    #notif.close()
+    os.unlink(tmpfile.name)
+
+
+def player(playlisturl):
+    files = urllib2.urlopen(playlisturl).read() #TODO: check for errors
+    playlist = files.split('\n')
+    cmd = ['mplayer', '-vo', 'null', '-quiet'] + playlist
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE) #TODO: check for errors
+    while p.poll() == None:
+        l = p.stdout.readline()
+        #parsing sample:
+        # ICY Info: StreamTitle='Jimi Hendrix - The Wind Cries Mary';StreamUrl='http://www.radioparadise.com/graphics/covers/m/B000002OOG.jpg';
+        if l.find("ICY Info: StreamTitle=") == -1:
+            continue
+        l = l[len('ICY Info: '):] #remove prefix
+        coverurl = artist = songname = ""
+        for tok in l.split(';'):
+            if len(tok) < 10:
+                continue
+            (tokname,tokvalue) = tok.split('=')
+            if tokname == "StreamTitle":
+                song = tokvalue.strip("'")
+                artist,songname = song.split(" - ", 1)
+            elif tokname == "StreamUrl":
+                coverurl = tokvalue.strip("'")
+        print "%s - %s"%(songname,artist)
+        show_current(artist, songname, coverurl)
+    ##p.kill()
+
+
+#TODO:
+# - properly exit on SIGSTOP, killing mplayer
+# - get a way to show again what is playing (shortcut, dock icon... ?)
+# - re-use notify object
+# - keep playlist and images in a cache
+# - use gstreamer instead of mplayer
+
+
+def main():
+    player ("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
+
+if __name__ == '__main__':
+    main()
