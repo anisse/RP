@@ -35,20 +35,19 @@ def player(playlisturl):
         for tok in l.split(';'):
             if len(tok) < 10:
                 continue
-            (tokname,tokvalue) = tok.split('=')
+            (tokname,tokvalue) = tok.split('=', 1)
             if tokname == "StreamTitle":
                 song = tokvalue.strip("'")
                 artist,songname = song.split(" - ", 1)
             elif tokname == "StreamUrl":
                 coverurl = tokvalue.strip("'")
-        print "%s - %s"%(songname,artist)
+        print "%s - %s"%(artist,songname)
         show_current(artist, songname, coverurl)
     ##p.kill()
 
 
 #TODO:
-# - properly exit on SIGSTOP, killing mplayer
-# - get a way to show again what is playing (shortcut, dock icon... ?)
+# - properly exit on SIGSTOP, killing mplayer, removing tempfile
 # - re-use notify object
 # - keep playlist and images in a cache
 # - use gstreamer instead of mplayer
