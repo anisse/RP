@@ -1,5 +1,15 @@
 #!/usr/bin/env python
 # coding: utf-8
+# RP, a micro Radio Paradise Player
+# Relies on mplayer + libnotify for OSD
+#
+# You can use mplayer bindings to control play. By default:
+# - q to exit
+# - / and * for vol- and vol +
+# - see mplayer man pages for others
+#
+# Author: Anisse Astier <anisse@astier.eu>
+
 
 import pynotify
 import urllib2
