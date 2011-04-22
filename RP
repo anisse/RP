@@ -16,6 +16,7 @@ import urllib2
 import tempfile
 import subprocess
 import os
+import cgi
 
 def show_current(text, subtext, imgurl):
     try:
@@ -27,6 +28,8 @@ def show_current(text, subtext, imgurl):
     except: #whatever happened(URL, fetching, tempfile creation…), we just don't have any image to show
         imgfilepath = None
 
+    # libnotify "Summary" is allowed to contain HTML markup. Escape HTML chars.
+    subtext = cgi.escape(subtext)
     notif = pynotify.Notification(text, subtext, imgfilepath)
     notif.set_timeout(3500)
     notif.show()
