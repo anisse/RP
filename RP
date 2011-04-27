@@ -17,8 +17,52 @@ import tempfile
 import subprocess
 import os
 import cgi
+import posixpath # for URL manipulation
+import time
 
-def show_current(text, subtext, imgurl):
+def cache_init(cachedir):
+    coverdir = cachedir + '/covers'
+    if not os.path.isdir(coverdir):
+        os.makedirs(coverdir) # we rely on OSError in case of failure
+
+def get_image(imgurl, cachedir = './cache/covers'):
+    # get basename
+    imgpath = cachedir + '/' + posixpath.basename(imgurl)
+    # check if it's in the cache
+    if os.path.exists(imgpath):
+        return imgpath
+    # small image is enough for our cache and display purpose.
+    imgurl = imgurl.replace('graphics/covers/m', 'graphics/covers/s') # this is specially for Radio Paradise
+    # download image in cache
+    try:
+        f = open(imgpath, 'w')
+        f.write(urllib2.urlopen(imgurl).read())
+        f.close()
+    except: #whatever happened(URL, fetching, file creation…), we just don't have any image to show
+        imgpath = None
+    return imgpath
+
+def now_playing(artist, song, imgurl):
+    cache_dir = os.getcwd() +  '/cache'
+    cache_init(cache_dir)
+    log = open(cache_dir + '/log', 'a')
+    log.write('"%s","%s","%s","%s"\n' %
+            (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
+                imgurl,artist,song))
+    log.close()
+    imgpath = get_image(imgurl, cache_dir + '/covers')
+    show_current(artist, song, imgpath)
+#    cleanup_img(imgpath)
+
+def show_current(text, subtext, imgfilepath):
+    # libnotify "Summary" is allowed to contain HTML markup. Escape HTML chars.
+    subtext = cgi.escape(subtext)
+    notif = pynotify.Notification(text, subtext, imgfilepath)
+    notif.set_timeout(3500)
+    notif.show()
+    #notif.close()
+
+def get_imagetmp(imgurl):
     try:
         img = urllib2.urlopen(imgurl).read()
         tmpfile = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
@@ -28,12 +72,7 @@ def show_current(text, subtext, imgurl):
     except: #whatever happened(URL, fetching, tempfile creation…), we just don't have any image to show
         imgfilepath = None
 
-    # libnotify "Summary" is allowed to contain HTML markup. Escape HTML chars.
-    subtext = cgi.escape(subtext)
-    notif = pynotify.Notification(text, subtext, imgfilepath)
-    notif.set_timeout(3500)
-    notif.show()
-    #notif.close()
+def cleanup_imagetmp(imgfilepath):
     if imgfilepath != None and tmpfile != None:
         os.unlink(tmpfile.name)
 
@@ -61,14 +100,14 @@ def player(playlisturl):
             elif tokname == "StreamUrl":
                 coverurl = tokvalue.strip("'")
         print "%s - %s"%(artist,songname)
-        show_current(artist, songname, coverurl)
+        now_playing(artist, songname, coverurl)
     #p.kill()
 
 
 #TODO:
-# - properly exit on SIGSTOP, killing mplayer, removing tempfile
+# - properly exit on SIGSTOP, killing mplayer
 # - re-use notify object
-# - keep playlist and images in a cache
+# - keep playlist in a cache
 # - use gstreamer instead of mplayer
 
 
