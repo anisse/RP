@@ -25,21 +25,37 @@ def cache_init(cachedir):
     if not os.path.isdir(coverdir):
         os.makedirs(coverdir) # we rely on OSError in case of failure
 
-def get_image(imgurl, cachedir = './cache/covers'):
+def get_image(imgurl, cachedir):
     # get basename
     imgpath = cachedir + '/' + posixpath.basename(imgurl)
     # check if it's in the cache
     if os.path.exists(imgpath):
         return imgpath
+    # Specially for Radio Paradise:
     # small image is enough for our cache and display purpose.
-    imgurl = imgurl.replace('graphics/covers/m', 'graphics/covers/s') # this is specially for Radio Paradise
+    if imgurl.find('graphics/covers/m') != -1:
+        # we try the small image first, then the provided URL
+        urlist = [imgurl.replace('graphics/covers/m', 'graphics/covers/s'), imgurl]
+    else:
+        urlist = [imgurl]
     # download image in cache
+    page = None
+    for url in urlist:
+        try:
+            page = urllib2.urlopen(url)
+        except: # we *really* want to ignore any error here.
+            pass
+        else: # stop at the first working url
+            break
+    if page == None: # no working url :-(
+        return None
+
     try:
         f = open(imgpath, 'w')
-        f.write(urllib2.urlopen(imgurl).read())
+        f.write(page.read())
         f.close()
-    except: #whatever happened(URL, fetching, file creation…), we just don't have any image to show
-        imgpath = None
+    except: #whatever happened(fetching, file creation…), we just don't have any image to show
+        return None
     return imgpath
 
 def now_playing(artist, song, imgurl):
@@ -62,6 +78,7 @@ def show_current(text, subtext, imgfilepath):
     notif.show()
     #notif.close()
 
+# TODO: in case cache cannot be initialized, we should use the temporary file code below
 def get_imagetmp(imgurl):
     try:
         img = urllib2.urlopen(imgurl).read()
@@ -71,10 +88,11 @@ def get_imagetmp(imgurl):
         imgfilepath = tmpfile.name
     except: #whatever happened(URL, fetching, tempfile creation…), we just don't have any image to show
         imgfilepath = None
+    return imgfilepath
 
 def cleanup_imagetmp(imgfilepath):
-    if imgfilepath != None and tmpfile != None:
-        os.unlink(tmpfile.name)
+    if imgfilepath != None and os.path.exists(imgfilepath):
+        os.unlink(imgfilepath)
 
 
 def player(playlisturl):
@@ -107,7 +125,7 @@ def player(playlisturl):
 #TODO:
 # - properly exit on SIGSTOP, killing mplayer
 # - re-use notify object
-# - keep playlist in a cache
+# - keep playlist in a cache (then randomize order for load-balancing)
 # - use gstreamer instead of mplayer
 
 
