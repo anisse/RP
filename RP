@@ -94,6 +94,24 @@ def cleanup_imagetmp(imgfilepath):
     if imgfilepath != None and os.path.exists(imgfilepath):
         os.unlink(imgfilepath)
 
+def parse_icyinfo(icystring):
+    #parsing sample:
+    # ICY Info: StreamTitle='Jimi Hendrix - The Wind Cries Mary';StreamUrl='http://www.radioparadise.com/graphics/covers/m/B000002OOG.jpg';
+    if icystring.find("ICY Info: StreamTitle=") == -1:
+        return None,None,None
+
+    streamurl = artist = songname = ""
+    l = icystring[len('ICY Info: '):] #remove prefix
+    for tok in l.split(';'):
+        if len(tok) < 2: # remove strings that
+            continue
+        tokname,tokvalue = tok.split('=', 1)
+        if tokname == "StreamTitle":
+            song = tokvalue.strip("'")
+            artist,songname = song.split(" - ", 1)
+        elif tokname == "StreamUrl":
+                streamurl = tokvalue.strip("'")
+    return artist,songname,streamurl
 
 def player(playlisturl):
     files = urllib2.urlopen(playlisturl).read() #TODO: check for errors
@@ -102,23 +120,11 @@ def player(playlisturl):
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE) #TODO: check for errors
     while p.poll() == None:
         l = p.stdout.readline()
-        #parsing sample:
-        # ICY Info: StreamTitle='Jimi Hendrix - The Wind Cries Mary';StreamUrl='http://www.radioparadise.com/graphics/covers/m/B000002OOG.jpg';
-        if l.find("ICY Info: StreamTitle=") == -1:
+        artist,song,coverurl = parse_icyinfo(l)
+        if artist == song == coverurl == None:
             continue
-        l = l[len('ICY Info: '):] #remove prefix
-        coverurl = artist = songname = ""
-        for tok in l.split(';'):
-            if len(tok) < 10:
-                continue
-            (tokname,tokvalue) = tok.split('=', 1)
-            if tokname == "StreamTitle":
-                song = tokvalue.strip("'")
-                artist,songname = song.split(" - ", 1)
-            elif tokname == "StreamUrl":
-                coverurl = tokvalue.strip("'")
-        print "%s - %s"%(artist,songname)
-        now_playing(artist, songname, coverurl)
+        print "%s - %s"%(artist,song)
+        now_playing(artist, song, coverurl)
     #p.kill()
 
 
