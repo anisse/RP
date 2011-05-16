@@ -40,19 +40,24 @@ def get_image(imgurl, cachedir):
         urlist = [imgurl]
     # download image in cache
     page = None
+    content = None
     for url in urlist:
         try:
             page = urllib2.urlopen(url)
+            content = page.read()
+            if len(content) <= 807: #this is hack to skip empty 1x1 GIF files
+                page = content = None
+                continue
         except: # we *really* want to ignore any error here.
             pass
         else: # stop at the first working url
             break
-    if page == None: # no working url :-(
+    if page == None or content == None: # no working url :-(
         return None
 
     try:
         f = open(imgpath, 'w')
-        f.write(page.read())
+        f.write(content)
         f.close()
     except: #whatever happened(fetching, file creation…), we just don't have any image to show
         return None
