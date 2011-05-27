@@ -149,6 +149,7 @@ def player(playlisturl):
 
 
 def main():
+    pynotify.init("RP")
     player ("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
 
 if __name__ == '__main__':
