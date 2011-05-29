@@ -21,83 +21,67 @@ import cgi
 import posixpath # for URL manipulation
 import time
 
-def cache_init(cachedir):
-    coverdir = cachedir + '/covers'
-    if not os.path.isdir(coverdir):
-        os.makedirs(coverdir) # we rely on OSError in case of failure
+class CachedCoverFetcher:
+    def __init__(self, cachedir):
+        self.coverdir = cachedir + '/covers'
+        if not os.path.isdir(self.coverdir):
+            os.makedirs(self.coverdir) # we expect OSError to be thrown to caller in case of failure
 
-def get_image(imgurl, cachedir):
-    # get basename
-    imgpath = cachedir + '/' + posixpath.basename(imgurl)
-    # check if it's in the cache
-    if os.path.exists(imgpath):
-        return imgpath
-    # Specially for Radio Paradise:
-    # small image is enough for our cache and display purpose.
-    if imgurl.find('graphics/covers/m') != -1:
-        # we try the small image first, then the provided URL
-        urlist = [imgurl.replace('graphics/covers/m', 'graphics/covers/s'), imgurl]
-    else:
-        urlist = [imgurl]
-    # download image in cache
-    page = None
-    content = None
-    for url in urlist:
+    def get_image(self, imgurl):
+        # get basename
+        imgpath = self.coverdir + '/' + posixpath.basename(imgurl)
+        # check if it's in the cache
+        if os.path.exists(imgpath):
+            return imgpath
+        # Specially for Radio Paradise:
+        # small image is enough for our cache and display purpose.
+        if imgurl.find('graphics/covers/m') != -1:
+            # we try the small image first, then the provided URL
+            urlist = [imgurl.replace('graphics/covers/m', 'graphics/covers/s'), imgurl]
+        else:
+            urlist = [imgurl]
+        # download image in cache
+        page = None
+        content = None
+        for url in urlist:
+            try:
+                page = urllib2.urlopen(url)
+                content = page.read()
+                if len(content) <= 807: #this is hack to skip empty 1x1 GIF files
+                    page = content = None
+                    continue
+            except: # we *really* want to ignore any error here.
+                pass
+            else: # stop at the first working url
+                break
+        if page == None or content == None: # no working url :-(
+            return None
+
         try:
-            page = urllib2.urlopen(url)
-            content = page.read()
-            if len(content) <= 807: #this is hack to skip empty 1x1 GIF files
-                page = content = None
-                continue
-        except: # we *really* want to ignore any error here.
-            pass
-        else: # stop at the first working url
-            break
-    if page == None or content == None: # no working url :-(
-        return None
-
-    try:
-        f = open(imgpath, 'w')
-        f.write(content)
-        f.close()
-    except: #whatever happened(fetching, file creation…), we just don't have any image to show
-        return None
-    return imgpath
+            f = open(imgpath, 'w')
+            f.write(content)
+            f.close()
+        except: #whatever happened in file creation/writing, we just don't have any image to show
+            return None
+        return imgpath
 
 # TODO: in case cache cannot be initialized, we should use the temporary file code below
-def get_imagetmp(imgurl):
-    try:
-        img = urllib2.urlopen(imgurl).read()
-        tmpfile = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
-        tmpfile.write(img)
-        tmpfile.close()
-        imgfilepath = tmpfile.name
-    except: #whatever happened(URL, fetching, tempfile creation…), we just don't have any image to show
-        imgfilepath = None
-    return imgfilepath
+class TmpCoverFetcher:
+    def get_imagetmp(self, imgurl):
+        try:
+            img = urllib2.urlopen(imgurl).read()
+            tmpfile = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+            tmpfile.write(img)
+            tmpfile.close()
+            imgfilepath = tmpfile.name
+        except: #whatever happened(URL, fetching, tempfile creation…), we just don't have any image to show
+            imgfilepath = None
+        return imgfilepath
 
-def cleanup_imagetmp(imgfilepath):
-    if imgfilepath != None and os.path.exists(imgfilepath):
-        os.unlink(imgfilepath)
+    def cleanup_imagetmp(self, imgfilepath):
+        if imgfilepath != None and os.path.exists(imgfilepath):
+            os.unlink(imgfilepath)
 
-def parse_icyinfo(icystring):
-    #parsing sample:
-    # ICY Info: StreamTitle='Jimi Hendrix - The Wind Cries Mary';StreamUrl='http://www.radioparadise.com/graphics/covers/m/B000002OOG.jpg';
-    if icystring.find("ICY Info: StreamTitle=") == -1:
-        return None,None,None
-
-    streamurl = artist = songname = ""
-    l = icystring[len('ICY Info: '):] #remove prefix
-    for tok in l.split(';'):
-        if len(tok) < 2: # remove strings that are empty or non-matching
-            continue
-        tokname,tokvalue = tok.split('=', 1)
-        if tokname == "StreamTitle":
-            song = tokvalue.strip("'")
-            artist,songname = song.split(" - ", 1)
-        elif tokname == "StreamUrl":
-                streamurl = tokvalue.strip("'")
-    return artist,songname,streamurl
 
 class Player:
     def __init__(self, playlisturl):
@@ -108,22 +92,44 @@ class Player:
         files = urllib2.urlopen(playlisturl).read() #TODO: check for errors
         self.cmd = ['mplayer', '-vo', 'null', '-quiet'] + files.split('\n')
 
+        self.cache_dir = os.getcwd() +  '/cache'
+        self.fetcher = CachedCoverFetcher(self.cache_dir)
+
     def __del__(self):
         self.notif.close()
         self.notif = None # loose object reference to allow uninit
         pynotify.uninit()
 
-    def now_playing(self, artist, song, imgurl):
-        cache_dir = os.getcwd() +  '/cache'
-        cache_init(cache_dir)
-        log = open(cache_dir + '/log', 'a')
+    def _parse_icyinfo(self, icystring):
+        #parsing sample:
+        # ICY Info: StreamTitle='Jimi Hendrix - The Wind Cries Mary';StreamUrl='http://www.radioparadise.com/graphics/covers/m/B000002OOG.jpg';
+        if icystring.find("ICY Info: StreamTitle=") == -1:
+            return None,None,None
+
+        streamurl = artist = songname = ""
+        l = icystring[len('ICY Info: '):] #remove prefix
+        for tok in l.split(';'):
+            if len(tok) < 2: # remove strings that are empty or non-matching
+                continue
+            tokname,tokvalue = tok.split('=', 1)
+            if tokname == "StreamTitle":
+                song = tokvalue.strip("'")
+                artist,songname = song.split(" - ", 1)
+            elif tokname == "StreamUrl":
+                    streamurl = tokvalue.strip("'")
+        return artist,songname,streamurl
+
+    def _now_playing(self, artist, song, imgurl):
+        # Log everything that is played
+        log = open(self.cache_dir + '/log', 'a')
         log.write('"%s","%s","%s","%s"\n' %
                 (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
                     imgurl,artist,song))
         log.close()
-        imgpath = get_image(imgurl, cache_dir + '/covers')
+
+        imgpath = self.fetcher.get_image(imgurl)
         self._show_current(artist, song, imgpath)
-    #    cleanup_img(imgpath)
+    #    self.fetcher.cleanup_img(imgpath)
 
     def _show_current(self, text, subtext, imgfilepath):
         # libnotify "Summary" is allowed to contain HTML markup. Escape HTML chars.
@@ -140,11 +146,11 @@ class Player:
         while p.poll() == None:
             try:
                 l = p.stdout.readline()
-                artist,song,coverurl = parse_icyinfo(l)
+                artist,song,coverurl = self._parse_icyinfo(l)
                 if artist == song == coverurl == None:
                     continue
                 print "%s - %s"%(artist,song)
-                self.now_playing(artist, song, coverurl)
+                self._now_playing(artist, song, coverurl)
             except KeyboardInterrupt:
                 p.terminate()
                 #time.sleep(1)
