@@ -64,26 +64,6 @@ def get_image(imgurl, cachedir):
         return None
     return imgpath
 
-def now_playing(artist, song, imgurl):
-    cache_dir = os.getcwd() +  '/cache'
-    cache_init(cache_dir)
-    log = open(cache_dir + '/log', 'a')
-    log.write('"%s","%s","%s","%s"\n' %
-            (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
-                imgurl,artist,song))
-    log.close()
-    imgpath = get_image(imgurl, cache_dir + '/covers')
-    show_current(artist, song, imgpath)
-#    cleanup_img(imgpath)
-
-def show_current(text, subtext, imgfilepath):
-    # libnotify "Summary" is allowed to contain HTML markup. Escape HTML chars.
-    subtext = cgi.escape(subtext)
-    notif = pynotify.Notification(text, subtext, imgfilepath)
-    notif.set_timeout(3500)
-    notif.show()
-    #notif.close()
-
 # TODO: in case cache cannot be initialized, we should use the temporary file code below
 def get_imagetmp(imgurl):
     try:
@@ -119,38 +99,66 @@ def parse_icyinfo(icystring):
                 streamurl = tokvalue.strip("'")
     return artist,songname,streamurl
 
-def player(playlisturl):
-    files = urllib2.urlopen(playlisturl).read() #TODO: check for errors
-    playlist = files.split('\n')
-    cmd = ['mplayer', '-vo', 'null', '-quiet'] + playlist
-    try:
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    except:
-        print "Unable to run mplayer. Do you have it installed on your system ?"
-        sys.exit(1)
-    while p.poll() == None:
+class Player:
+    def __init__(self, playlisturl):
+        pynotify.init("RP")
+        self.notif = pynotify.Notification("RP", "A micro Radio Paradise player")
+        self.notif.set_timeout(3500)
+
+        files = urllib2.urlopen(playlisturl).read() #TODO: check for errors
+        self.cmd = ['mplayer', '-vo', 'null', '-quiet'] + files.split('\n')
+
+    def __del__(self):
+        self.notif.close()
+        self.notif = None # loose object reference to allow uninit
+        pynotify.uninit()
+
+    def now_playing(self, artist, song, imgurl):
+        cache_dir = os.getcwd() +  '/cache'
+        cache_init(cache_dir)
+        log = open(cache_dir + '/log', 'a')
+        log.write('"%s","%s","%s","%s"\n' %
+                (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
+                    imgurl,artist,song))
+        log.close()
+        imgpath = get_image(imgurl, cache_dir + '/covers')
+        self._show_current(artist, song, imgpath)
+    #    cleanup_img(imgpath)
+
+    def _show_current(self, text, subtext, imgfilepath):
+        # libnotify "Summary" is allowed to contain HTML markup. Escape HTML chars.
+        subtext = cgi.escape(subtext)
+        self.notif.update(text, subtext, imgfilepath)
+        self.notif.show()
+
+    def play(self):
         try:
-            l = p.stdout.readline()
-            artist,song,coverurl = parse_icyinfo(l)
-            if artist == song == coverurl == None:
-                continue
-            print "%s - %s"%(artist,song)
-            now_playing(artist, song, coverurl)
-        except KeyboardInterrupt:
-            p.terminate()
-            #time.sleep(1)
-            #p.kill()
+            p = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except:
+            print "Unable to run mplayer. Do you have it installed on your system ?"
+            sys.exit(1)
+        while p.poll() == None:
+            try:
+                l = p.stdout.readline()
+                artist,song,coverurl = parse_icyinfo(l)
+                if artist == song == coverurl == None:
+                    continue
+                print "%s - %s"%(artist,song)
+                self.now_playing(artist, song, coverurl)
+            except KeyboardInterrupt:
+                p.terminate()
+                #time.sleep(1)
+                #p.kill()
 
 
 #TODO:
-# - re-use notify object
 # - keep playlist in a cache (then randomize order for load-balancing)
 # - use gstreamer instead of mplayer
 
 
 def main():
-    pynotify.init("RP")
-    player ("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
+    player = Player("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
+    player.play()
 
 if __name__ == '__main__':
     main()
