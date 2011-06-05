@@ -89,8 +89,8 @@ class Player:
         self.notif = pynotify.Notification("RP", "A micro Radio Paradise player")
         self.notif.set_timeout(3500)
 
-        files = urllib2.urlopen(playlisturl).read() #TODO: check for errors
-        self.cmd = ['mplayer', '-vo', 'null', '-quiet'] + files.split('\n')
+        playlist = urllib2.urlopen(playlisturl).read() #TODO: check for errors
+        self.cmd = ['mplayer', '-vo', 'null', '-quiet'] + playlist.split('\n')
 
         self.cache_dir = os.getcwd() +  '/cache'
         self.fetcher = CachedCoverFetcher(self.cache_dir)
@@ -159,6 +159,9 @@ class Player:
 
 #TODO:
 # - keep playlist in a cache (then randomize order for load-balancing)
+# - Add a setup.py to allow installation and python packaging
+# - Put cache in a "real" cache directory (e.g /var/cache/)
+# - Python3 compatiblity
 # - use gstreamer instead of mplayer
 
 
