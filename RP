@@ -40,18 +40,10 @@ import cgi
 import posixpath # for URL manipulation
 import time
 
-class CachedCoverFetcher:
-    def __init__(self, cachedir):
-        self.coverdir = cachedir + '/covers'
-        if not os.path.isdir(self.coverdir):
-            os.makedirs(self.coverdir) # we expect OSError to be thrown to caller in case of failure
-
+# This should be an abstract base class (abc)
+# anyway, using it will fail because self.imgpath is not defined
+class CoverFetcher:
     def get_image(self, imgurl):
-        # get basename
-        imgpath = self.coverdir + '/' + posixpath.basename(imgurl)
-        # check if it's in the cache
-        if os.path.exists(imgpath):
-            return imgpath
         # Specially for Radio Paradise:
         # small image is enough for our cache and display purpose.
         if imgurl.find('graphics/covers/m') != -1:
@@ -77,30 +69,36 @@ class CachedCoverFetcher:
             return None
 
         try:
-            f = open(imgpath, 'wb')
+            f = open(self.imgpath, 'wb')
             f.write(content)
             f.close()
         except: #whatever happened in file creation/writing, we just don't have any image to show
             return None
-        return imgpath
+        return self.imgpath
 
-# TODO: in case cache cannot be initialized, we should use the temporary file code below
-class TmpCoverFetcher:
-    def get_imagetmp(self, imgurl):
-        try:
-            img = urlopen(imgurl).read()
-            tmpfile = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
-            tmpfile.write(img)
-            tmpfile.close()
-            imgfilepath = tmpfile.name
-        except: #whatever happened(URL, fetching, tempfile creation…), we just don't have any image to show
-            imgfilepath = None
-        return imgfilepath
+class CachedCoverFetcher(CoverFetcher):
+    def __init__(self, cachedir):
+        self.coverdir = cachedir + '/covers'
+        if not os.path.isdir(self.coverdir):
+            os.makedirs(self.coverdir) # we expect OSError to be thrown to caller in case of failure
 
-    def cleanup_imagetmp(self, imgfilepath):
-        if imgfilepath != None and os.path.exists(imgfilepath):
-            os.unlink(imgfilepath)
+    def get_image(self, imgurl):
+        # get basename
+        self.imgpath = self.coverdir + '/' + posixpath.basename(imgurl)
+        # check if it's in the cache
+        if os.path.exists(self.imgpath):
+            return self.imgpath
 
+        return CoverFetcher.get_image(self, imgurl)
+
+class TmpCoverFetcher(CoverFetcher):
+    def __init__(self):
+        tmpfile = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+        tmpfile.close()
+        self.imgpath = tmpfile.name
+    def __del__(self):
+        if os.path.exists(self.imgpath):
+            os.unlink(self.imgpath)
 
 class Player:
     def __init__(self, playlisturl):
@@ -112,7 +110,10 @@ class Player:
         self.cmd = ['mplayer', '-vo', 'null', '-quiet'] + b(playlist).split('\n')
 
         self.cache_dir = os.getcwd() +  '/cache'
-        self.fetcher = CachedCoverFetcher(self.cache_dir)
+        try:
+            self.fetcher = CachedCoverFetcher(self.cache_dir)
+        except:
+            self.fetcher = TmpCoverFetcher()
 
     def __del__(self):
         self.notif.close()
