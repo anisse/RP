@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 # coding: utf-8
 # RP, a micro Radio Paradise Player
-# Relies on mplayer + libnotify for OSD
+# Relies on python-gstreamer + libnotify for OSD
 #
-# You can use mplayer bindings to control play. By default:
-# - q to exit
-# - / and * for vol- and vol +
-# - see mplayer man pages for others
+# - Ctrl+C to exit
 #
 # Author: Anisse Astier <anisse@astier.eu>
 
 
 # Python 3 compatibility
+# XXX: Useless with gstreamer :-(((
 from __future__ import print_function
 import sys
 PYTHON3 = sys.version_info >= (3, 0)
@@ -39,6 +37,10 @@ import os
 import cgi
 import posixpath # for URL manipulation
 import time
+
+import gobject, glib, pygst
+pygst.require("0.10")
+import gst
 
 # This should be an abstract base class (abc)
 # anyway, using it will fail because self.imgpath is not defined
@@ -106,8 +108,13 @@ class Player:
         self.notif = pynotify.Notification("RP", "A micro Radio Paradise player")
         self.notif.set_timeout(3500)
 
-        playlist = urlopen(playlisturl).read() #TODO: check for errors
-        self.cmd = ['mplayer', '-vo', 'null', '-quiet'] + b(playlist).split('\n')
+        self.playlist = b(urlopen(playlisturl).read()).split('\n') #TODO: check for errors
+
+        self.player = gst.element_factory_make("playbin2", "player")
+        self.bus = self.player.get_bus()
+        self.bus.add_signal_watch()
+        self.bus.connect("message", self.on_message)
+        gobject.threads_init()
 
         self.cache_dir = os.getcwd() +  '/cache'
         try:
@@ -119,25 +126,6 @@ class Player:
         self.notif.close()
         self.notif = None # loose object reference to allow uninit
         pynotify.uninit()
-
-    def _parse_icyinfo(self, icystring):
-        #parsing sample:
-        # ICY Info: StreamTitle='Jimi Hendrix - The Wind Cries Mary';StreamUrl='http://www.radioparadise.com/graphics/covers/m/B000002OOG.jpg';
-        if icystring.find("ICY Info: StreamTitle=") == -1:
-            return None,None,None
-
-        streamurl = artist = songname = ""
-        l = icystring[len('ICY Info: '):] #remove prefix
-        for tok in l.split(';'):
-            if len(tok) < 2: # remove strings that are empty or non-matching
-                continue
-            tokname,tokvalue = tok.split('=', 1)
-            if tokname == "StreamTitle":
-                song = tokvalue.strip("'")
-                artist,songname = song.split(" - ", 1)
-            elif tokname == "StreamUrl":
-                    streamurl = tokvalue.strip("'")
-        return artist,songname,streamurl
 
     def _now_playing(self, artist, song, imgurl):
         # Log everything that is played
@@ -157,31 +145,47 @@ class Player:
         self.notif.update(text, subtext, imgfilepath)
         self.notif.show()
 
+    def on_message(self, bus, message):
+        t = message.type
+        artist = song = coverurl = None
+        update = False
+        if t == gst.MESSAGE_ERROR:
+            print(message.parse_error())
+            self.player.set_state(gst.STATE_NULL)
+            self.loop.quit()
+
+        if t == gst.MESSAGE_TAG:
+            tags =  message.parse_tag()
+            for tag in tags.keys():
+                if tag == 'title':
+                    artist,song = tags[tag].split(" - ", 1)
+                    update = True
+                elif tag == 'homepage':
+                    coverurl = tags[tag]
+                    update = True
+        if update == True:
+            print("%s - %s"%(artist,song))
+            self._now_playing(artist, song, coverurl)
+
     def play(self):
-        try:
-            p = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        except:
-            print("Unable to run mplayer. Do you have it installed on your system ?")
-            sys.exit(1)
-        while p.poll() == None:
+        for url in self.playlist:
+            self.player.set_property("uri", url)
+            self.player.set_state(gst.STATE_PLAYING)
+
+            #XXX: Start a main loop for each try. UGLY !
+            self.loop = glib.MainLoop()
             try:
-                l = p.stdout.readline()
-                artist,song,coverurl = self._parse_icyinfo(b(l))
-                if artist == song == coverurl == None:
-                    continue
-                print("%s - %s"%(artist,song))
-                self._now_playing(artist, song, coverurl)
+                self.loop.run()
             except KeyboardInterrupt:
-                p.terminate()
-                #time.sleep(1)
-                #p.kill()
+                print("\n")
+                sys.exit(0)
+
 
 
 #TODO:
 # - keep playlist in a cache (then randomize order for load-balancing)
 # - Add a setup.py to allow installation and python packaging
 # - Put cache in a "real" cache directory (e.g /var/cache/)
-# - use gstreamer instead of mplayer
 
 
 def main():
