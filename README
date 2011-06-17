@@ -1,0 +1,8 @@
+RP is a micro Radio Paradise Player
+Relies on python-gstreamer + libnotify for OSD
+
+Use Ctrl+C to exit.
+
+
+
+Author: Anisse Astier <anisse@astier.eu>
