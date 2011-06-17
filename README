@@ -3,6 +3,6 @@ Relies on python-gstreamer + libnotify for OSD
 
 Use Ctrl+C to exit.
 
-
+RP is licensed under GPLv3+.
 
 Author: Anisse Astier <anisse@astier.eu>
