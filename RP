@@ -123,6 +123,7 @@ class Player:
             self.fetcher = TmpCoverFetcher()
 
     def __del__(self):
+        self.bus.remove_signal_watch()
         self.notif.close()
         self.notif = None # loose object reference to allow uninit
         pynotify.uninit()
