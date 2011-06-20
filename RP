@@ -136,7 +136,10 @@ class Player:
                     imgurl,artist,song))
         log.close()
 
-        imgpath = self.fetcher.get_image(imgurl)
+        if imgurl != None:
+            imgpath = self.fetcher.get_image(imgurl)
+        else:
+            imgpath = None
         self._show_current(artist, song, imgpath)
     #    self.fetcher.cleanup_img(imgpath)
 
