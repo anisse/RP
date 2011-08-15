@@ -42,6 +42,9 @@ import gobject, glib, pygst
 pygst.require("0.10")
 import gst
 
+from PyQt4.QtCore import SIGNAL, SLOT
+from PyQt4.QtGui import QApplication, QMainWindow, QPushButton
+
 # This should be an abstract base class (abc)
 # anyway, using it will fail because self.imgpath is not defined
 class CoverFetcher:
@@ -173,7 +176,7 @@ class Player:
             print("%s - %s"%(artist,song))
             self._now_playing(artist, song, coverurl)
 
-    # Go onto next playlist element or quit we reached the end
+    # Go onto next playlist element or quit if we reached the end
     def next(self):
         self.currentplaylistitem += 1
         if self.currentplaylistitem >= len(self.playlist):
@@ -186,13 +189,23 @@ class Player:
         self.player.set_property("uri", self.playlist[self.currentplaylistitem])
         self.player.set_state(gst.STATE_PLAYING)
 
-        loop = glib.MainLoop()
-        try:
-            loop.run()
-        except KeyboardInterrupt:
-            print("\n")
-            sys.exit(0)
 
+class MainWindow(QMainWindow):
+    def __init__(self):
+        QMainWindow.__init__(self)
+        self.setWindowTitle('RP')
+        self.button = QPushButton(self)
+        self.button.setText('Play')
+        self.setCentralWidget(self.button)
+        self.connect(self.button, SIGNAL('clicked()'), self.play_quit)
+        self.player = Player("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
+
+    def play_quit(self):
+        if self.button.text() == 'Play':
+            self.button.setText('Quit')
+            self.player.play()
+        else:
+            sys.exit(0)
 
 
 #TODO:
@@ -202,8 +215,12 @@ class Player:
 
 
 def main():
-    player = Player("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
-    player.play()
+    qApp = QApplication(sys.argv)
+    qApp.connect(qApp, SIGNAL('lastWindowClosed()'),
+                 qApp, SLOT('quit()'))
+    mainwindow = MainWindow()
+    mainwindow.show()
+    sys.exit(qApp.exec_())
 
 if __name__ == '__main__':
     main()
