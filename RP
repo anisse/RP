@@ -42,8 +42,9 @@ import gobject, glib, pygst
 pygst.require("0.10")
 import gst
 
-from PyQt4.QtCore import SIGNAL, SLOT
-from PyQt4.QtGui import QApplication, QMainWindow, QPushButton
+from PyQt4.QtCore import SIGNAL, SLOT, Qt
+from PyQt4.QtGui import QApplication, QMainWindow, QPushButton, \
+        QImage, QLabel, QVBoxLayout, QPixmap, QWidget
 
 # This should be an abstract base class (abc)
 # anyway, using it will fail because self.imgpath is not defined
@@ -143,10 +144,9 @@ class Player:
             imgpath = self.fetcher.get_image(imgurl)
         else:
             imgpath = None
-        self._show_current(artist, song, imgpath)
-    #    self.fetcher.cleanup_img(imgpath)
+        self.show_current(artist, song, imgpath)
 
-    def _show_current(self, text, subtext, imgfilepath):
+    def show_current(self, text, subtext, imgfilepath):
         # libnotify "Summary" is allowed to contain HTML markup. Escape HTML chars.
         subtext = cgi.escape(subtext)
         self.notif.update(text, subtext, imgfilepath)
@@ -161,7 +161,7 @@ class Player:
             self.player.set_state(gst.STATE_NULL)
 
         elif t == gst.MESSAGE_EOS:
-            self.next()
+            self._next()
 
         elif t == gst.MESSAGE_TAG:
             tags =  message.parse_tag()
@@ -177,7 +177,7 @@ class Player:
             self._now_playing(artist, song, coverurl)
 
     # Go onto next playlist element or quit if we reached the end
-    def next(self):
+    def _next(self):
         self.currentplaylistitem += 1
         if self.currentplaylistitem >= len(self.playlist):
             sys.exit(0)
@@ -194,11 +194,25 @@ class MainWindow(QMainWindow):
     def __init__(self):
         QMainWindow.__init__(self)
         self.setWindowTitle('RP')
+
         self.button = QPushButton(self)
         self.button.setText('Play')
-        self.setCentralWidget(self.button)
         self.connect(self.button, SIGNAL('clicked()'), self.play_quit)
+
+        self.title = QLabel('')
+        self.title.setAlignment(Qt.AlignCenter)
+        self.cover = QLabel('')
+        self.cover.setAlignment(Qt.AlignCenter)
+        widget = QWidget(self)
+        layout = QVBoxLayout()
+        layout.addWidget(self.button)
+        layout.addWidget(self.title)
+        layout.addWidget(self.cover)
+        widget.setLayout(layout)
+        self.setCentralWidget(widget)
+
         self.player = Player("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
+        self.player.show_current = self.update_details
 
     def play_quit(self):
         if self.button.text() == 'Play':
@@ -206,6 +220,12 @@ class MainWindow(QMainWindow):
             self.player.play()
         else:
             sys.exit(0)
+
+    def update_details(self, artist, song, coverimg):
+        self.title.setText("%s - %s"%(artist,song))
+        self.cover.setPixmap(QPixmap(coverimg))
+        self.title.update()
+        self.cover.update()
 
 
 #TODO:
