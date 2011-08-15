@@ -156,9 +156,11 @@ class Player:
         if t == gst.MESSAGE_ERROR:
             print(message.parse_error())
             self.player.set_state(gst.STATE_NULL)
-            self.loop.quit()
 
-        if t == gst.MESSAGE_TAG:
+        elif t == gst.MESSAGE_EOS:
+            self.next()
+
+        elif t == gst.MESSAGE_TAG:
             tags =  message.parse_tag()
             for tag in tags.keys():
                 if tag == 'title':
@@ -171,18 +173,25 @@ class Player:
             print("%s - %s"%(artist,song))
             self._now_playing(artist, song, coverurl)
 
-    def play(self):
-        for url in self.playlist:
-            self.player.set_property("uri", url)
-            self.player.set_state(gst.STATE_PLAYING)
+    # Go onto next playlist element or quit we reached the end
+    def next(self):
+        self.currentplaylistitem += 1
+        if self.currentplaylistitem >= len(self.playlist):
+            sys.exit(0)
+        self.player.set_property("uri", self.playlist[self.currentplaylistitem])
+        self.player.set_state(gst.STATE_PLAYING)
 
-            #XXX: Start a main loop for each try. UGLY !
-            self.loop = glib.MainLoop()
-            try:
-                self.loop.run()
-            except KeyboardInterrupt:
-                print("\n")
-                sys.exit(0)
+    def play(self):
+        self.currentplaylistitem = 0
+        self.player.set_property("uri", self.playlist[self.currentplaylistitem])
+        self.player.set_state(gst.STATE_PLAYING)
+
+        loop = glib.MainLoop()
+        try:
+            loop.run()
+        except KeyboardInterrupt:
+            print("\n")
+            sys.exit(0)
 
 
 
