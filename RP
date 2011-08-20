@@ -29,7 +29,7 @@ if PYTHON3:
 else:
     b = lambda s : s
     from urllib2 import urlopen
-    import pynotify
+#    import pynotify
 
 import tempfile
 import subprocess
@@ -108,9 +108,9 @@ class TmpCoverFetcher(CoverFetcher):
 
 class Player:
     def __init__(self, playlisturl):
-        pynotify.init("RP")
-        self.notif = pynotify.Notification("RP", "A micro Radio Paradise player")
-        self.notif.set_timeout(3500)
+#        pynotify.init("RP")
+#        self.notif = pynotify.Notification("RP", "A micro Radio Paradise player")
+#        self.notif.set_timeout(3500)
 
         self.playlist = b(urlopen(playlisturl).read()).split('\n') #TODO: check for errors
 
@@ -128,9 +128,9 @@ class Player:
 
     def __del__(self):
         self.bus.remove_signal_watch()
-        self.notif.close()
-        self.notif = None # loose object reference to allow uninit
-        pynotify.uninit()
+#        self.notif.close()
+#        self.notif = None # loose object reference to allow uninit
+#        pynotify.uninit()
 
     def _now_playing(self, artist, song, imgurl):
         # Log everything that is played
@@ -149,8 +149,8 @@ class Player:
     def show_current(self, text, subtext, imgfilepath):
         # libnotify "Summary" is allowed to contain HTML markup. Escape HTML chars.
         subtext = cgi.escape(subtext)
-        self.notif.update(text, subtext, imgfilepath)
-        self.notif.show()
+#        self.notif.update(text, subtext, imgfilepath)
+#        self.notif.show()
 
     def on_message(self, bus, message):
         t = message.type
