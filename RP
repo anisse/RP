@@ -196,7 +196,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle('RP')
 
         self.button = QPushButton(self)
-        self.button.setText('Play')
+        self.button.setText('Quit')
         self.connect(self.button, SIGNAL('clicked()'), self.play_quit)
 
         self.title = QLabel('')
@@ -213,6 +213,7 @@ class MainWindow(QMainWindow):
 
         self.player = Player("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
         self.player.show_current = self.update_details
+        self.player.play()
 
     def play_quit(self):
         if self.button.text() == 'Play':
