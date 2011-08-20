@@ -42,9 +42,14 @@ import gobject, glib, pygst
 pygst.require("0.10")
 import gst
 
-from PyQt4.QtCore import SIGNAL, SLOT, Qt
-from PyQt4.QtGui import QApplication, QMainWindow, QPushButton, \
-        QImage, QLabel, QVBoxLayout, QPixmap, QWidget
+try :
+    from PyQt4.QtCore import SIGNAL, SLOT, Qt
+    from PyQt4.QtGui import QApplication, QMainWindow, QPushButton, \
+            QImage, QLabel, QVBoxLayout, QPixmap, QWidget
+except:
+    from PySide.QtCore import SIGNAL, SLOT, Qt
+    from PySide.QtGui import QApplication, QMainWindow, QPushButton, \
+            QImage, QLabel, QVBoxLayout, QPixmap, QWidget
 
 # This should be an abstract base class (abc)
 # anyway, using it will fail because self.imgpath is not defined
