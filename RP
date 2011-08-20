@@ -202,7 +202,6 @@ class MainWindow(QMainWindow):
 
         self.button = QPushButton(self)
         self.button.setText('Quit')
-        self.connect(self.button, SIGNAL('clicked()'), self.play_quit)
 
         self.title = QLabel('')
         self.title.setAlignment(Qt.AlignCenter)
@@ -219,13 +218,6 @@ class MainWindow(QMainWindow):
         self.player = Player("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
         self.player.show_current = self.update_details
         self.player.play()
-
-    def play_quit(self):
-        if self.button.text() == 'Play':
-            self.button.setText('Quit')
-            self.player.play()
-        else:
-            sys.exit(0)
 
     def update_details(self, artist, song, coverimg):
         self.title.setText("%s - %s"%(artist,song))
@@ -245,6 +237,7 @@ def main():
     qApp.connect(qApp, SIGNAL('lastWindowClosed()'),
                  qApp, SLOT('quit()'))
     mainwindow = MainWindow()
+    mainwindow.connect(mainwindow.button, SIGNAL('clicked()'), qApp, SLOT('quit()'))
     mainwindow.show()
     sys.exit(qApp.exec_())
 
