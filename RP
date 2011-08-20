@@ -53,8 +53,8 @@ class CoverFetcher:
         # Specially for Radio Paradise:
         # small image is enough for our cache and display purpose.
         if imgurl.find('graphics/covers/m') != -1:
-            # we try the small image first, then the provided URL
-            urlist = [imgurl.replace('graphics/covers/m', 'graphics/covers/s'), imgurl]
+            # we try the big image first, then the provided URL
+            urlist = [imgurl.replace('graphics/covers/m', 'graphics/covers/l'), imgurl]
         else:
             urlist = [imgurl]
         # download image in cache
