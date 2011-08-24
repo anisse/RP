@@ -16,40 +16,27 @@ PYTHON3 = sys.version_info >= (3, 0)
 if PYTHON3:
     b = lambda s : str(s, encoding='utf8') # buffer(urlopen, file reading) conversion to strings for parsing
     from urllib.request import urlopen
-    # pynotify is for now only compatible with python 2 :-(
-    # Implement a stub for python 3
-    class pynotify:
-        init = lambda s : None
-        uninit = lambda : None
-        class Notification:
-            __init__ = lambda s, s1, s2 : None
-            set_timeout = lambda s, i : None
-            update = lambda s, s1, s2, s3 : None
-            show = close = lambda s : None
 else:
     b = lambda s : s
     from urllib2 import urlopen
-#    import pynotify
 
 import tempfile
-import subprocess
 import os
-import cgi
 import posixpath # for URL manipulation
 import time
 
-import gobject, glib, pygst
+import gobject, pygst
 pygst.require("0.10")
 import gst
 
 try :
     from PyQt4.QtCore import SIGNAL, SLOT, Qt
     from PyQt4.QtGui import QApplication, QMainWindow, QPushButton, \
-            QImage, QLabel, QVBoxLayout, QPixmap, QWidget
+            QLabel, QVBoxLayout, QPixmap, QWidget
 except:
     from PySide.QtCore import SIGNAL, SLOT, Qt
     from PySide.QtGui import QApplication, QMainWindow, QPushButton, \
-            QImage, QLabel, QVBoxLayout, QPixmap, QWidget
+            QLabel, QVBoxLayout, QPixmap, QWidget
 
 # This should be an abstract base class (abc)
 # anyway, using it will fail because self.imgpath is not defined
@@ -113,10 +100,6 @@ class TmpCoverFetcher(CoverFetcher):
 
 class Player:
     def __init__(self, playlisturl):
-#        pynotify.init("RP")
-#        self.notif = pynotify.Notification("RP", "A micro Radio Paradise player")
-#        self.notif.set_timeout(3500)
-
         self.playlist = b(urlopen(playlisturl).read()).split('\n') #TODO: check for errors
 
         self.player = gst.element_factory_make("playbin2", "player")
@@ -133,29 +116,21 @@ class Player:
 
     def __del__(self):
         self.bus.remove_signal_watch()
-#        self.notif.close()
-#        self.notif = None # loose object reference to allow uninit
-#        pynotify.uninit()
 
     def _now_playing(self, artist, song, imgurl):
         # Log everything that is played
-        log = open(self.cache_dir + '/log', 'a')
-        log.write('"%s","%s","%s","%s"\n' %
-                (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
-                    imgurl,artist,song))
-        log.close()
+        if imgurl == None: #only if we have an image
+            log = open(self.cache_dir + '/log', 'a')
+            log.write('"%s","%s","%s","%s"\n' %
+                    (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
+                        imgurl,artist,song))
+            log.close()
 
         if imgurl != None:
             imgpath = self.fetcher.get_image(imgurl)
         else:
             imgpath = None
         self.show_current(artist, song, imgpath)
-
-    def show_current(self, text, subtext, imgfilepath):
-        # libnotify "Summary" is allowed to contain HTML markup. Escape HTML chars.
-        subtext = cgi.escape(subtext)
-#        self.notif.update(text, subtext, imgfilepath)
-#        self.notif.show()
 
     def on_message(self, bus, message):
         t = message.type
@@ -229,7 +204,7 @@ class MainWindow(QMainWindow):
 #TODO:
 # - keep playlist in a cache (then randomize order for load-balancing)
 # - Add a setup.py to allow installation and python packaging
-# - Put cache in a "real" cache directory (e.g /var/cache/)
+# - Put cache in a "real" cache directory (e.g ~/.config/RP/cache/)
 
 
 def main():
