@@ -108,7 +108,7 @@ class Player:
         self.bus.connect("message", self.on_message)
         gobject.threads_init()
 
-        self.cache_dir = os.getcwd() +  '/cache'
+        self.cache_dir = os.path.expanduser('~/.config/RP/cache')
         try:
             self.fetcher = CachedCoverFetcher(self.cache_dir)
         except:
@@ -204,7 +204,6 @@ class MainWindow(QMainWindow):
 #TODO:
 # - keep playlist in a cache (then randomize order for load-balancing)
 # - Add a setup.py to allow installation and python packaging
-# - Put cache in a "real" cache directory (e.g ~/.config/RP/cache/)
 
 
 def main():
