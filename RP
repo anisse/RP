@@ -32,11 +32,13 @@ import gst
 try :
     from PyQt4.QtCore import SIGNAL, SLOT, Qt
     from PyQt4.QtGui import QApplication, QMainWindow, QPushButton, \
-            QLabel, QVBoxLayout, QPixmap, QWidget
+            QLabel, QVBoxLayout, QHBoxLayout, QPixmap, QWidget, QGroupBox, \
+            QIcon
 except:
     from PySide.QtCore import SIGNAL, SLOT, Qt
     from PySide.QtGui import QApplication, QMainWindow, QPushButton, \
-            QLabel, QVBoxLayout, QPixmap, QWidget
+            QLabel, QVBoxLayout, QHBoxLayout, QPixmap, QWidget, QGroupBox, \
+            QIcon
 
 # This should be an abstract base class (abc)
 # anyway, using it will fail because self.imgpath is not defined
@@ -174,22 +176,39 @@ class MainWindow(QMainWindow):
     def __init__(self):
         QMainWindow.__init__(self)
         self.setWindowTitle('RP')
+        self.setMinimumSize(800, 600)
 
-        self.button = QPushButton(self)
-        self.button.setText('Quit')
+        # Global window
+        widget = QWidget(self)
+        self.setCentralWidget(widget)
+        mainlayout = QHBoxLayout()
+        widget.setLayout(mainlayout)
+
+        #left and right panes
+        historybox = QGroupBox("History", widget)
+        nowbox = QGroupBox("Now playing", widget)
+
+        mainlayout.addWidget(historybox)
+        mainlayout.addWidget(nowbox)
+
+        #right pane
+        nowlayout = QVBoxLayout()
+        nowbox.setLayout(nowlayout)
 
         self.title = QLabel('')
         self.title.setAlignment(Qt.AlignCenter)
         self.cover = QLabel('')
         self.cover.setAlignment(Qt.AlignCenter)
-        widget = QWidget(self)
-        layout = QVBoxLayout()
-        layout.addWidget(self.button)
-        layout.addWidget(self.title)
-        layout.addWidget(self.cover)
-        widget.setLayout(layout)
-        self.setCentralWidget(widget)
 
+        self.quitbutton = QPushButton(self)
+        self.quitbutton.setText('Quit')
+        self.quitbutton.setIcon(QIcon.fromTheme('exit'))
+
+        nowlayout.addWidget(self.title)
+        nowlayout.addWidget(self.cover)
+        nowlayout.addWidget(self.quitbutton)
+
+        #player
         self.player = Player("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
         self.player.show_current = self.update_details
         self.player.play()
@@ -211,7 +230,7 @@ def main():
     qApp.connect(qApp, SIGNAL('lastWindowClosed()'),
                  qApp, SLOT('quit()'))
     mainwindow = MainWindow()
-    mainwindow.connect(mainwindow.button, SIGNAL('clicked()'), qApp, SLOT('quit()'))
+    mainwindow.connect(mainwindow.quitbutton, SIGNAL('clicked()'), qApp, SLOT('quit()'))
     mainwindow.show()
     sys.exit(qApp.exec_())
 
