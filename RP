@@ -33,12 +33,12 @@ try :
     from PyQt4.QtCore import SIGNAL, SLOT, Qt
     from PyQt4.QtGui import QApplication, QMainWindow, QPushButton, \
             QLabel, QVBoxLayout, QHBoxLayout, QPixmap, QWidget, QGroupBox, \
-            QIcon
+            QIcon, QGridLayout
 except:
     from PySide.QtCore import SIGNAL, SLOT, Qt
     from PySide.QtGui import QApplication, QMainWindow, QPushButton, \
             QLabel, QVBoxLayout, QHBoxLayout, QPixmap, QWidget, QGroupBox, \
-            QIcon
+            QIcon, QGridLayout
 
 # This should be an abstract base class (abc)
 # anyway, using it will fail because self.imgpath is not defined
@@ -121,7 +121,7 @@ class Player:
 
     def _now_playing(self, artist, song, imgurl):
         # Log everything that is played
-        if imgurl == None: #only if we have an image
+        if imgurl != None: #only if we have an image
             log = open(self.cache_dir + '/log', 'a')
             log.write('"%s","%s","%s","%s"\n' %
                     (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
@@ -171,12 +171,108 @@ class Player:
         self.player.set_property("uri", self.playlist[self.currentplaylistitem])
         self.player.set_state(gst.STATE_PLAYING)
 
+class History(QGridLayout):
+    columns = 3
+    lines = 4
+    history = [] #XXX: we never access full history, only last item : clean it up
+
+    def __init__(self, parent, logfile, coverfetcher):
+        """previousitems is a list of (text, image) tuples"""
+        QGridLayout.__init__(self, parent)
+        self.fetcher = coverfetcher
+
+        for l in range(self.lines*2):
+            for c in range(self.columns):
+                self.addWidget(QLabel(""), l, c, Qt.AlignCenter)
+
+        self.load_history_from_log(logfile)
+
+    def load_history_from_log(self, logfile):
+        try:
+            f = open(logfile)
+        except:
+            return
+        try:
+            # Read last 32 lines average line length is 121 chars
+            f.seek(-(121 * 32), 2)
+        except:
+            #we went too far
+            f.seek(0)
+        lines = f.read().splitlines()
+        if f.tell() > 121 * 32: # File is big - skip first, potentially bogus line
+            del lines[0]
+        f.close()
+
+        # line format to parse:
+        # "toignore","item2","item0","item1"
+        for line in lines:
+            items = line.split('","') # who needs csv.reader ?
+            self.add_history_item(items[2], items[3].strip('"'), self.fetcher.get_image(items[1]))
+
+
+    def belongs_to_history(self, item):
+        #No empty items
+        for i in item:
+            if i == None or len(i) == 0 or i == "None":
+                return False
+        #should not be the same as the last element
+        if len(self.history) > 0:
+            for i in zip(item, self.history[-1]):
+                if i[0] == i[1]:
+                    return False
+        #should not be a "Radio Paradise" item
+        if item[0] == "Radio Paradise":
+            return False
+        return True
+
+
+    def shift_grid(self):
+        prevline = self.lines - 1
+        prevcol = self.columns - 2
+        #start at the end
+        for l in range(self.lines - 1, -1, -1):
+            for c in range(self.columns - 1, -1, -1):
+                prevpix = self.itemAtPosition(prevline*2, prevcol).widget().pixmap()
+                if prevpix != None:
+                    self.itemAtPosition(l*2, c).widget().setPixmap(prevpix)
+                prevtext = self.itemAtPosition(prevline*2+1, prevcol).widget().text()
+                self.itemAtPosition(l*2+1, c).widget().setText(prevtext)
+
+                if c == 1: # go to previous line, last column
+                    if l == 0: # we reached the end
+                        break
+                    prevline = prevline - 1
+                    prevcol = self.columns -1
+                else: # go to prevous column, same line
+                    prevcol = prevcol -1
+
+    def add_history_item(self, artist, song, image):
+        if self.belongs_to_history((artist, song, image)):
+            self.history.append((artist, song, image))
+
+            #Only keep the last 12 items
+            if len(self.history) > 12:
+                del self.history[0]
+            self.shift_grid()
+
+            self.itemAtPosition(0, 0).widget().setPixmap(QPixmap(image).scaled(96,96))
+            self.itemAtPosition(1, 0).widget().setText("%s - %s"%(artist,song))
+
+            self.update_grid()
+
+    def update_grid(self):
+        for l in range(self.lines*2):
+            for c in range(self.columns):
+                self.itemAtPosition(l, c).widget().update()
+
+
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
         QMainWindow.__init__(self)
         self.setWindowTitle('RP')
-        self.setMinimumSize(800, 600)
+        self.setMinimumSize(1024, 600)
 
         # Global window
         widget = QWidget(self)
@@ -203,6 +299,7 @@ class MainWindow(QMainWindow):
         self.quitbutton = QPushButton(self)
         self.quitbutton.setText('Quit')
         self.quitbutton.setIcon(QIcon.fromTheme('exit'))
+        self.quitbutton.setMinimumSize(100, 60)
 
         nowlayout.addWidget(self.title)
         nowlayout.addWidget(self.cover)
@@ -212,6 +309,11 @@ class MainWindow(QMainWindow):
         self.player = Player("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
         self.player.show_current = self.update_details
         self.player.play()
+
+        #left pane
+        history = History(self, self.player.cache_dir + "/log", self.player.fetcher)
+        historybox.setLayout(history)
+
 
     def update_details(self, artist, song, coverimg):
         self.title.setText("%s - %s"%(artist,song))
