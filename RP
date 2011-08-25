@@ -228,23 +228,22 @@ class History(QGridLayout):
 
     def shift_grid(self):
         prevline = self.lines - 1
-        prevcol = self.columns - 2
+        prevcol = self.columns - 1
         #start at the end
-        for l in range(self.lines - 1, -1, -1):
-            for c in range(self.columns - 1, -1, -1):
-                prevpix = self.itemAtPosition(prevline*2, prevcol).widget().pixmap()
-                if prevpix != None:
-                    self.itemAtPosition(l*2, c).widget().setPixmap(prevpix)
-                prevtext = self.itemAtPosition(prevline*2+1, prevcol).widget().text()
-                self.itemAtPosition(l*2+1, c).widget().setText(prevtext)
+        for line in range(self.lines - 1, -1, -1):
+            for col in range(self.columns - 1, -1, -1):
+                if line == prevline and col == prevcol:
+                    continue
+                pix = self.itemAtPosition(line*2, col).widget().pixmap()
+                if pix == None:
+                    pix = QPixmap()
+                self.itemAtPosition(prevline*2, prevcol).widget().setPixmap(pix)
 
-                if c == 1: # go to previous line, last column
-                    if l == 0: # we reached the end
-                        break
-                    prevline = prevline - 1
-                    prevcol = self.columns -1
-                else: # go to prevous column, same line
-                    prevcol = prevcol -1
+                text = self.itemAtPosition(line*2+1, col).widget().text()
+                self.itemAtPosition(prevline*2+1, prevcol).widget().setText(text)
+                prevcol = col
+                prevline = line
+
 
     def add_history_item(self, artist, song, image):
         if self.belongs_to_history((artist, song, image)):
@@ -311,11 +310,12 @@ class MainWindow(QMainWindow):
         self.player.play()
 
         #left pane
-        history = History(self, self.player.cache_dir + "/log", self.player.fetcher)
-        historybox.setLayout(history)
+        self.history = History(self, self.player.cache_dir + "/log", self.player.fetcher)
+        historybox.setLayout(self.history)
 
 
     def update_details(self, artist, song, coverimg):
+        self.history.add_history_item(artist, song, coverimg)
         self.title.setText("%s - %s"%(artist,song))
         self.cover.setPixmap(QPixmap(coverimg))
         self.title.update()
