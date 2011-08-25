@@ -185,7 +185,9 @@ class History(QGridLayout):
 
         for l in range(self.lines*2):
             for c in range(self.columns):
-                self.addWidget(QLabel(""), l, c, Qt.AlignCenter)
+                label = QLabel("")
+                label.setAlignment(Qt.AlignCenter)
+                self.addWidget(label, l, c, Qt.AlignCenter)
 
         self.load_history_from_log(logfile)
 
@@ -257,7 +259,7 @@ class History(QGridLayout):
             self.shift_grid()
 
             self.itemAtPosition(0, 0).widget().setPixmap(QPixmap(image).scaled(96,96))
-            self.itemAtPosition(1, 0).widget().setText("%s - %s"%(artist,song))
+            self.itemAtPosition(1, 0).widget().setText("%s\n%s"%(artist,song))
 
             self.update_grid()
 
