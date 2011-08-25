@@ -128,6 +128,8 @@ class Player:
                         imgurl,artist,song))
             log.close()
 
+        # Update text while we wait for image to load
+        self.show_current_preview(artist, song)
         if imgurl != None:
             imgpath = self.fetcher.get_image(imgurl)
         else:
@@ -276,8 +278,7 @@ class MainWindow(QMainWindow):
         # Global window
         widget = QWidget(self)
         self.setCentralWidget(widget)
-        mainlayout = QHBoxLayout()
-        widget.setLayout(mainlayout)
+        mainlayout = QHBoxLayout(widget)
 
         #left and right panes
         historybox = QGroupBox("History", widget)
@@ -287,8 +288,7 @@ class MainWindow(QMainWindow):
         mainlayout.addWidget(nowbox)
 
         #right pane
-        nowlayout = QVBoxLayout()
-        nowbox.setLayout(nowlayout)
+        nowlayout = QVBoxLayout(nowbox)
 
         self.title = QLabel('')
         self.title.setAlignment(Qt.AlignCenter)
@@ -307,19 +307,28 @@ class MainWindow(QMainWindow):
         #player
         self.player = Player("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
         self.player.show_current = self.update_details
+        self.player.show_current_preview = self.update_text
         self.player.play()
 
         #left pane
-        self.history = History(self, self.player.cache_dir + "/log", self.player.fetcher)
-        historybox.setLayout(self.history)
+        self.history = History(historybox, self.player.cache_dir + "/log", self.player.fetcher)
 
 
     def update_details(self, artist, song, coverimg):
-        self.history.add_history_item(artist, song, coverimg)
-        self.title.setText("%s - %s"%(artist,song))
+        if hasattr(self, "now_playing"):
+            self.history.add_history_item(self.now_playing[0],
+                    self.now_playing[1], self.now_playing[2])
+        self.now_playing = (artist, song, coverimg)
+        self.update_text(artist, song)
         self.cover.setPixmap(QPixmap(coverimg))
+        self.cover.update()
+
+    def update_text(self, artist, song):
+        self.title.setText("%s - %s"%(artist,song))
+        self.cover.setPixmap(QPixmap())
         self.title.update()
         self.cover.update()
+
 
 
 #TODO:
