@@ -29,17 +29,6 @@ import gobject, pygst
 pygst.require("0.10")
 import gst
 
-try :
-    from PyQt4.QtCore import SIGNAL, SLOT, Qt
-    from PyQt4.QtGui import QApplication, QMainWindow, QPushButton, \
-            QLabel, QVBoxLayout, QHBoxLayout, QPixmap, QWidget, QGroupBox, \
-            QIcon, QGridLayout
-except:
-    from PySide.QtCore import SIGNAL, SLOT, Qt
-    from PySide.QtGui import QApplication, QMainWindow, QPushButton, \
-            QLabel, QVBoxLayout, QHBoxLayout, QPixmap, QWidget, QGroupBox, \
-            QIcon, QGridLayout
-
 # This should be an abstract base class (abc)
 # anyway, using it will fail because self.imgpath is not defined
 class CoverFetcher:
@@ -173,179 +162,23 @@ class Player:
         self.player.set_property("uri", self.playlist[self.currentplaylistitem])
         self.player.set_state(gst.STATE_PLAYING)
 
-class History(QGridLayout):
-    columns = 3
-    lines = 4
-    history = [] #XXX: we never access full history, only last item : clean it up
-
-    def __init__(self, parent, logfile, coverfetcher):
-        """previousitems is a list of (text, image) tuples"""
-        QGridLayout.__init__(self, parent)
-        self.fetcher = coverfetcher
-
-        for l in range(self.lines*2):
-            for c in range(self.columns):
-                label = QLabel("")
-                label.setAlignment(Qt.AlignCenter)
-                self.addWidget(label, l, c, Qt.AlignCenter)
-
-        self.load_history_from_log(logfile)
-
-    def load_history_from_log(self, logfile):
-        try:
-            f = open(logfile)
-        except:
-            return
-        try:
-            # Read last 32 lines average line length is 121 chars
-            f.seek(-(121 * 32), 2)
-        except:
-            #we went too far
-            f.seek(0)
-        lines = f.read().splitlines()
-        if f.tell() > 121 * 32: # File is big - skip first, potentially bogus line
-            del lines[0]
-        f.close()
-
-        # line format to parse:
-        # "toignore","item2","item0","item1"
-        for line in lines:
-            items = line.split('","') # who needs csv.reader ?
-            self.add_history_item(items[2], items[3].strip('"'), self.fetcher.get_image(items[1]))
-
-
-    def belongs_to_history(self, item):
-        #No empty items
-        for i in item:
-            if i == None or len(i) == 0 or i == "None":
-                return False
-        #should not be the same as the last element
-        if len(self.history) > 0:
-            for i in zip(item, self.history[-1]):
-                if i[0] == i[1]:
-                    return False
-        #should not be a "Radio Paradise" item
-        if item[0] == "Radio Paradise":
-            return False
-        return True
-
-
-    def shift_grid(self):
-        prevline = self.lines - 1
-        prevcol = self.columns - 1
-        #start at the end
-        for line in range(self.lines - 1, -1, -1):
-            for col in range(self.columns - 1, -1, -1):
-                if line == prevline and col == prevcol:
-                    continue
-                pix = self.itemAtPosition(line*2, col).widget().pixmap()
-                if pix == None:
-                    pix = QPixmap()
-                self.itemAtPosition(prevline*2, prevcol).widget().setPixmap(pix)
-
-                text = self.itemAtPosition(line*2+1, col).widget().text()
-                self.itemAtPosition(prevline*2+1, prevcol).widget().setText(text)
-                prevcol = col
-                prevline = line
-
-
-    def add_history_item(self, artist, song, image):
-        if self.belongs_to_history((artist, song, image)):
-            self.history.append((artist, song, image))
-
-            #Only keep the last 12 items
-            if len(self.history) > 12:
-                del self.history[0]
-            self.shift_grid()
-
-            self.itemAtPosition(0, 0).widget().setPixmap(QPixmap(image).scaled(96,96))
-            self.itemAtPosition(1, 0).widget().setText("%s\n%s"%(artist,song))
-
-            self.update_grid()
-
-    def update_grid(self):
-        for l in range(self.lines*2):
-            for c in range(self.columns):
-                self.itemAtPosition(l, c).widget().update()
-
-
-
-
-class MainWindow(QMainWindow):
-    def __init__(self):
-        QMainWindow.__init__(self)
-        self.setWindowTitle('RP')
-        self.setMinimumSize(1024, 600)
-
-        # Global window
-        widget = QWidget(self)
-        self.setCentralWidget(widget)
-        mainlayout = QHBoxLayout(widget)
-
-        #left and right panes
-        historybox = QGroupBox("History", widget)
-        nowbox = QGroupBox("Now playing", widget)
-
-        mainlayout.addWidget(historybox)
-        mainlayout.addWidget(nowbox)
-
-        #right pane
-        nowlayout = QVBoxLayout(nowbox)
-
-        self.title = QLabel('')
-        self.title.setAlignment(Qt.AlignCenter)
-        self.cover = QLabel('')
-        self.cover.setAlignment(Qt.AlignCenter)
-
-        self.quitbutton = QPushButton(self)
-        self.quitbutton.setText('Quit')
-        self.quitbutton.setIcon(QIcon.fromTheme('exit'))
-        self.quitbutton.setMinimumSize(100, 60)
-
-        nowlayout.addWidget(self.title)
-        nowlayout.addWidget(self.cover)
-        nowlayout.addWidget(self.quitbutton)
-
-        #player
-        self.player = Player("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
-        self.player.show_current = self.update_details
-        self.player.show_current_preview = self.update_text
-        self.player.play()
-
-        #left pane
-        self.history = History(historybox, self.player.cache_dir + "/log", self.player.fetcher)
-
-
-    def update_details(self, artist, song, coverimg):
-        if hasattr(self, "now_playing"):
-            self.history.add_history_item(self.now_playing[0],
-                    self.now_playing[1], self.now_playing[2])
-        self.now_playing = (artist, song, coverimg)
-        self.update_text(artist, song)
-        self.cover.setPixmap(QPixmap(coverimg))
-        self.cover.update()
-
-    def update_text(self, artist, song):
-        self.title.setText("%s - %s"%(artist,song))
-        self.cover.setPixmap(QPixmap())
-        self.title.update()
-        self.cover.update()
-
 
 
 #TODO:
 # - keep playlist in a cache (then randomize order for load-balancing)
 # - Add a setup.py to allow installation and python packaging
 
+def show_current():
+    pass
+
+def show_current_preview():
+    pass
 
 def main():
-    qApp = QApplication(sys.argv)
-    qApp.connect(qApp, SIGNAL('lastWindowClosed()'),
-                 qApp, SLOT('quit()'))
-    mainwindow = MainWindow()
-    mainwindow.connect(mainwindow.quitbutton, SIGNAL('clicked()'), qApp, SLOT('quit()'))
-    mainwindow.show()
-    sys.exit(qApp.exec_())
+    player = Player("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
+    player.show_current = show_current
+    player.show_current_preview = show_current_preview
+    player.play()
 
 if __name__ == '__main__':
     main()
