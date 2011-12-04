@@ -168,10 +168,10 @@ class Player:
 # - keep playlist in a cache (then randomize order for load-balancing)
 # - Add a setup.py to allow installation and python packaging
 
-def show_current():
+def show_current(*args):
     pass
 
-def show_current_preview():
+def show_current_preview(*args):
     pass
 
 def main():
@@ -179,6 +179,14 @@ def main():
     player.show_current = show_current
     player.show_current_preview = show_current_preview
     player.play()
+    import glib
+    loop = glib.MainLoop()
+    try:
+        loop.run()
+    except KeyboardInterrupt:
+        print("\n")
+        sys.exit(0)
+
 
 if __name__ == '__main__':
     main()
