@@ -32,12 +32,19 @@ import gst
 # This should be an abstract base class (abc)
 # anyway, using it will fail because self.imgpath is not defined
 class CoverFetcher:
+    def __init__(self, sizepreference=None):
+        #Accepted arguments 'l' (large) or 's' (small)
+        if sizepreference == 'l' or sizepreference == 's':
+            self.sizepref = sizepreference
+        else:
+            self.sizepref = None
+
     def get_image(self, imgurl):
         # Specially for Radio Paradise:
         # small image is enough for our cache and display purpose.
-        if imgurl.find('graphics/covers/m') != -1:
+        if imgurl.find('graphics/covers/m') != -1 and self.sizepref != None:
             # we try the big image first, then the provided URL
-            urlist = [imgurl.replace('graphics/covers/m', 'graphics/covers/l'), imgurl]
+            urlist = [imgurl.replace('graphics/covers/m', 'graphics/covers/'+self.sizepref), imgurl]
         else:
             urlist = [imgurl]
         # download image in cache
@@ -66,10 +73,11 @@ class CoverFetcher:
         return self.imgpath
 
 class CachedCoverFetcher(CoverFetcher):
-    def __init__(self, cachedir):
+    def __init__(self, cachedir, sizepref=None):
         self.coverdir = cachedir + '/covers'
         if not os.path.isdir(self.coverdir):
             os.makedirs(self.coverdir) # we expect OSError to be thrown to caller in case of failure
+        CoverFetcher.__init__(self, sizepref)
 
     def get_image(self, imgurl):
         # get basename
@@ -81,16 +89,18 @@ class CachedCoverFetcher(CoverFetcher):
         return CoverFetcher.get_image(self, imgurl)
 
 class TmpCoverFetcher(CoverFetcher):
-    def __init__(self):
+    def __init__(self, sizepref=None):
         tmpfile = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
         tmpfile.close()
         self.imgpath = tmpfile.name
+        CoverFetcher.__init__(self, sizepref)
+
     def __del__(self):
         if os.path.exists(self.imgpath):
             os.unlink(self.imgpath)
 
 class Player:
-    def __init__(self, playlisturl):
+    def __init__(self, playlisturl, sizepref=None):
         self.playlist = b(urlopen(playlisturl).read()).split('\n') #TODO: check for errors
 
         self.player = gst.element_factory_make("playbin2", "player")
@@ -101,9 +111,9 @@ class Player:
 
         self.cache_dir = os.path.expanduser('~/.config/RP/cache')
         try:
-            self.fetcher = CachedCoverFetcher(self.cache_dir)
+            self.fetcher = CachedCoverFetcher(self.cache_dir, sizepref)
         except:
-            self.fetcher = TmpCoverFetcher()
+            self.fetcher = TmpCoverFetcher(sizepref)
 
     def __del__(self):
         self.bus.remove_signal_watch()
