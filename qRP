@@ -153,7 +153,7 @@ class MainWindow(QMainWindow):
         nowlayout.addWidget(self.quitbutton)
 
         #player
-        self.player = Player("http://www.radioparadise.com/musiclinks/rp_128aac.m3u")
+        self.player = Player("http://www.radioparadise.com/musiclinks/rp_128aac.m3u", sizepref='l')
         self.player.show_current = self.update_details
         self.player.show_current_preview = self.update_text
         self.player.play()
