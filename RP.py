@@ -184,6 +184,7 @@ class Player:
 
 #TODO:
 # - keep playlist in a cache (then randomize order for load-balancing)
+# - XDG spec compatibility
 # - Add a setup.py to allow installation and python packaging
 
 def show_current(*args):
