@@ -100,21 +100,63 @@ class TmpCoverFetcher(CoverFetcher):
         if os.path.exists(self.imgpath):
             os.unlink(self.imgpath)
 
-class Player:
-    def __init__(self, playlisturl, sizepref=None):
-        self.playlist = b(urlopen(playlisturl).read()).split('\n') #TODO: check for errors
-
+class GstreamerBackend:
+    def __init__(self, update_cb, eos_cb):
         # before constructing gstreamer pipeline, check if we have the required
         # icydemux version to get images in the "homepage" tag
         icydemux_version = gst.registry_get_default().find_plugin("icydemux").get_version()
         # feature we want was added in version 0.10.27, commit be2d04e040aa3a6fb556f660fbfa624d32a3f017
         if parse_version(icydemux_version) < parse_version("0.10.27"):
             raise RuntimeError("Your gstreamer version is too old to get cover art")
+
+        self.update_cb = update_cb
+        self.eos_cb = eos_cb
+
         self.player = gst.element_factory_make("playbin2", "player")
         self.bus = self.player.get_bus()
         self.bus.add_signal_watch()
         self.bus.connect("message", self.on_message)
         gobject.threads_init()
+
+    def __del__(self):
+        if hasattr(self, "bus"):
+            self.bus.remove_signal_watch()
+
+    def on_message(self, bus, message):
+        t = message.type
+        artist = song = coverurl = None
+        update = False
+        if t == gst.MESSAGE_ERROR:
+            print(message.parse_error())
+            self.player.set_state(gst.STATE_NULL)
+
+        elif t == gst.MESSAGE_EOS:
+            self.eos_cb()
+
+        elif t == gst.MESSAGE_TAG:
+            tags =  message.parse_tag()
+            for tag in tags.keys():
+                if tag == 'title':
+                    artist,song = tags[tag].split(" - ", 1)
+                    update = True
+                elif tag == 'homepage':
+                    coverurl = tags[tag]
+                    update = True
+        if update == True:
+            print("%s - %s"%(artist,song))
+            self.update_cb(artist, song, coverurl)
+
+    # Go onto next playlist element or quit if we reached the end
+    def play(self, uri):
+        self.player.set_property("uri", uri)
+        self.player.set_state(gst.STATE_PLAYING)
+
+
+class Player:
+    def __init__(self, playlisturl, sizepref=None):
+        self.playlist = b(urlopen(playlisturl).read()).split('\n') #TODO: check for errors
+
+        self.backend = GstreamerBackend(self._now_playing, self._next)
 
         self.cache_dir = os.path.expanduser('~/.config/RP/cache')
         try:
@@ -122,9 +164,6 @@ class Player:
         except:
             self.fetcher = TmpCoverFetcher(sizepref)
 
-    def __del__(self):
-        if hasattr(self, "bus"):
-            self.bus.remove_signal_watch()
 
     def _now_playing(self, artist, song, imgurl):
         # Log everything that is played
@@ -143,42 +182,16 @@ class Player:
             imgpath = None
         self.show_current(artist, song, imgpath)
 
-    def on_message(self, bus, message):
-        t = message.type
-        artist = song = coverurl = None
-        update = False
-        if t == gst.MESSAGE_ERROR:
-            print(message.parse_error())
-            self.player.set_state(gst.STATE_NULL)
-
-        elif t == gst.MESSAGE_EOS:
-            self._next()
-
-        elif t == gst.MESSAGE_TAG:
-            tags =  message.parse_tag()
-            for tag in tags.keys():
-                if tag == 'title':
-                    artist,song = tags[tag].split(" - ", 1)
-                    update = True
-                elif tag == 'homepage':
-                    coverurl = tags[tag]
-                    update = True
-        if update == True:
-            print("%s - %s"%(artist,song))
-            self._now_playing(artist, song, coverurl)
-
     # Go onto next playlist element or quit if we reached the end
     def _next(self):
         self.currentplaylistitem += 1
         if self.currentplaylistitem >= len(self.playlist):
             sys.exit(0)
-        self.player.set_property("uri", self.playlist[self.currentplaylistitem])
-        self.player.set_state(gst.STATE_PLAYING)
+        self.backend.play(self.playlist[self.currentplaylistitem])
 
     def play(self):
         self.currentplaylistitem = 0
-        self.player.set_property("uri", self.playlist[self.currentplaylistitem])
-        self.player.set_state(gst.STATE_PLAYING)
+        self.backend.play(self.playlist[self.currentplaylistitem])
 
 
 
