@@ -24,6 +24,7 @@ import tempfile
 import os
 import posixpath # for URL manipulation
 import time
+from pkg_resources import parse_version
 
 import gobject, pygst
 pygst.require("0.10")
@@ -103,6 +104,12 @@ class Player:
     def __init__(self, playlisturl, sizepref=None):
         self.playlist = b(urlopen(playlisturl).read()).split('\n') #TODO: check for errors
 
+        # before constructing gstreamer pipeline, check if we have the required
+        # icydemux version to get images in the "homepage" tag
+        icydemux_version = gst.registry_get_default().find_plugin("icydemux").get_version()
+        # feature we want was added in version 0.10.27, commit be2d04e040aa3a6fb556f660fbfa624d32a3f017
+        if parse_version(icydemux_version) < parse_version("0.10.27"):
+            raise RuntimeError("Your gstreamer version is too old to get cover art")
         self.player = gst.element_factory_make("playbin2", "player")
         self.bus = self.player.get_bus()
         self.bus.add_signal_watch()
@@ -116,7 +123,8 @@ class Player:
             self.fetcher = TmpCoverFetcher(sizepref)
 
     def __del__(self):
-        self.bus.remove_signal_watch()
+        if hasattr(self, "bus"):
+            self.bus.remove_signal_watch()
 
     def _now_playing(self, artist, song, imgurl):
         # Log everything that is played
