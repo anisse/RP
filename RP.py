@@ -154,7 +154,9 @@ class GstreamerBackend:
 
 class Player:
     def __init__(self, playlisturl, sizepref=None):
-        self.playlist = b(urlopen(playlisturl).read()).split('\n') #TODO: check for errors
+        self.playlist = [ i.strip()
+                for i in b(urlopen(playlisturl).read()).split('\n')
+                    if len(i) > 1 and i[0] != '#'] #TODO: check for urlopen errors
 
         self.backend = GstreamerBackend(self._now_playing, self._next)
 
@@ -192,7 +194,6 @@ class Player:
     def play(self):
         self.currentplaylistitem = 0
         self.backend.play(self.playlist[self.currentplaylistitem])
-
 
 
 #TODO:
