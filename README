@@ -1,7 +1,7 @@
 RP is a micro Radio Paradise Player
 Relies on python-gstreamer + libnotify for OSD
 
-Use Ctrl+C to exit.
+qRP is PyQt/PySide interface to RP.
 
 RP is licensed under GPLv3+.
 
