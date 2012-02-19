@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 # RP, a micro Radio Paradise Player
-# Relies on python-gstreamer + libnotify for OSD
 #
 # - Ctrl+C to exit
 #
@@ -250,6 +249,8 @@ class Player:
 # - keep playlist in a cache (then randomize order for load-balancing)
 # - XDG spec compatibility
 # - Add a setup.py to allow installation and python packaging
+# - Different storage for different sizes
+# - Bring back Python 3 support with pygi
 
 def show_current(*args):
     pass
