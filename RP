@@ -1,0 +1,42 @@
+#!/usr/bin/env python
+# coding: utf-8
+# RP, a micro Radio Paradise Player
+# Relies on python-gstreamer + libnotify for OSD
+#
+# - Ctrl+C to exit
+#
+# Author: Anisse Astier <anisse@astier.eu>
+
+from RP import Player
+import sys
+import pynotify
+import cgi
+import glib
+
+notif = pynotify.Notification("RP", "A micro Radio Paradise player")
+def show_current(text, subtext, imgfilepath=""):
+    # libnotify "Summary" is allowed to contain HTML markup. Escape HTML chars.
+    subtext = cgi.escape(subtext)
+
+    notif.update(text, subtext, imgfilepath)
+    notif.show()
+
+def main():
+    pynotify.init("RP")
+    notif.set_timeout(3500)
+
+    player = Player("http://www.radioparadise.com/musiclinks/rp_128aac.m3u", sizepref="s")
+    player.show_current = show_current
+    player.show_current_preview = show_current
+    player.play()
+
+    loop = glib.MainLoop()
+    try:
+        loop.run()
+    except KeyboardInterrupt:
+        print("\n")
+        sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()
