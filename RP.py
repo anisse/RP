@@ -24,6 +24,7 @@ import tempfile
 import os
 import posixpath # for URL manipulation
 import time
+import subprocess
 from pkg_resources import parse_version
 
 import gobject, pygst
@@ -115,14 +116,14 @@ class GstreamerBackend:
         self.player = gst.element_factory_make("playbin2", "player")
         self.bus = self.player.get_bus()
         self.bus.add_signal_watch()
-        self.bus.connect("message", self.on_message)
+        self.bus.connect("message", self._on_message)
         gobject.threads_init()
 
     def __del__(self):
         if hasattr(self, "bus"):
             self.bus.remove_signal_watch()
 
-    def on_message(self, bus, message):
+    def _on_message(self, bus, message):
         t = message.type
         artist = song = coverurl = None
         update = False
@@ -151,6 +152,52 @@ class GstreamerBackend:
         self.player.set_property("uri", uri)
         self.player.set_state(gst.STATE_PLAYING)
 
+class MplayerBackend:
+    def __init__(self, update_cb, eos_cb):
+        self.update_cb = update_cb
+        self.eos_cb = eos_cb
+
+        self.cmd = ['mplayer', '-vo', 'null', '-quiet', '-softvol']
+
+    def _parse_icyinfo(self, icystring):
+        #parsing sample:
+        # ICY Info: StreamTitle='Jimi Hendrix - The Wind Cries Mary';StreamUrl='http://www.radioparadise.com/graphics/covers/m/B000002OOG.jpg';
+        if icystring.find("ICY Info: StreamTitle=") == -1:
+            return None,None,None
+
+        streamurl = artist = songname = ""
+        l = icystring[len('ICY Info: '):] #remove prefix
+        for tok in l.split(';'):
+            if len(tok) < 2: # remove strings that are empty or non-matching
+                continue
+            tokname,tokvalue = tok.split('=', 1)
+            if tokname == "StreamTitle":
+                song = tokvalue.strip("'")
+                artist,songname = song.split(" - ", 1)
+            elif tokname == "StreamUrl":
+                    streamurl = tokvalue.strip("'")
+        return artist,songname,streamurl
+
+    #TODO:
+    # - fix semantics of the play() call. This backend should really be in a separate thread in order to be on par with the gstreamer backend, and allow this function to return once it's started.
+    # - allow support of multiple playlist elements
+    def play(self, uri):
+        try:
+            p = subprocess.Popen(self.cmd + [uri], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except:
+            print("Unable to run mplayer. Do you have it installed on your system ?")
+            sys.exit(1)
+        while p.poll() == None:
+            try:
+                l = p.stdout.readline()
+                artist,song,coverurl = self._parse_icyinfo(b(l))
+                if artist == song == coverurl == None:
+                    continue
+                print("%s - %s"%(artist,song))
+                self.update_cb(artist, song, coverurl)
+            except KeyboardInterrupt:
+                p.terminate()
+        sys.exit(1)
 
 class Player:
     def __init__(self, playlisturl, sizepref=None):
@@ -158,7 +205,10 @@ class Player:
                 for i in b(urlopen(playlisturl).read()).split('\n')
                     if len(i) > 1 and i[0] != '#'] #TODO: check for urlopen errors
 
-        self.backend = GstreamerBackend(self._now_playing, self._next)
+        try:
+            self.backend = GstreamerBackend(self._now_playing, self._next)
+        except:
+            self.backend = MplayerBackend(self._now_playing, self._next)
 
         self.cache_dir = os.path.expanduser('~/.config/RP/cache')
         try:
