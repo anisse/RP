@@ -178,7 +178,7 @@ class MplayerBackend:
         return artist,songname,streamurl
 
     #TODO:
-    # - fix semantics of the play() call. This backend should really be in a separate thread in order to be on par with the gstreamer backend, and allow this function to return once it's started.
+    # - fix semantics of the play() call. This backend should really be in a separate thread in order to be on par with the gstreamer backend, and allow this function to return once it's started. Also, this breaks the qRP UI
     # - allow support of multiple playlist elements
     def play(self, uri):
         try:
