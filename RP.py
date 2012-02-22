@@ -209,17 +209,22 @@ class Player:
         except:
             self.backend = MplayerBackend(self._now_playing, self._next)
 
-        self.cache_dir = os.path.expanduser('~/.config/RP/cache')
+        cachedir = os.getenv("XDG_CACHE_HOME", "~/.cache")
+        self.cache_dir = os.path.expanduser(cachedir+"/RP")
         try:
             self.fetcher = CachedCoverFetcher(self.cache_dir, sizepref)
         except:
             self.fetcher = TmpCoverFetcher(sizepref)
 
+        datahome = os.getenv("XDG_DATA_HOME", "~/.local/share")
+        if not os.path.isdir(datahome + "/RP"):
+            os.makedirs(datahome + "/RP") # we expect OSError to be thrown to caller in case of failure
+        self.logfile = os.path.expanduser(datahome + "/RP/log")
 
     def _now_playing(self, artist, song, imgurl):
         # Log everything that is played
         if imgurl != None: #only if we have an image
-            log = open(self.cache_dir + '/log', 'a')
+            log = open(self.logfile, 'a')
             log.write('"%s","%s","%s","%s"\n' %
                     (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
                         imgurl,artist,song))
@@ -247,7 +252,6 @@ class Player:
 
 #TODO:
 # - keep playlist in a cache (then randomize order for load-balancing)
-# - XDG spec compatibility
 # - Add a setup.py to allow installation and python packaging
 # - Different storage for different sizes
 # - Bring back Python 3 support with pygi

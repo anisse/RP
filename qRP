@@ -159,7 +159,7 @@ class MainWindow(QMainWindow):
         self.player.play()
 
         #left pane
-        self.history = History(historybox, self.player.cache_dir + "/log", self.player.fetcher)
+        self.history = History(historybox, self.player.logfile, self.player.fetcher)
 
 
     def update_details(self, artist, song, coverimg):
