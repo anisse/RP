@@ -32,7 +32,7 @@ import gst
 
 # This should be an abstract base class (abc)
 # anyway, using it will fail because self.imgpath is not defined
-class CoverFetcher:
+class _CoverFetcher:
     def __init__(self, sizepreference=None):
         #Accepted arguments 'l' (large) or 's' (small)
         if sizepreference == 'l' or sizepreference == 's':
@@ -73,12 +73,12 @@ class CoverFetcher:
             return None
         return self.imgpath
 
-class CachedCoverFetcher(CoverFetcher):
+class CachedCoverFetcher(_CoverFetcher):
     def __init__(self, cachedir, sizepref=None):
         self.coverdir = cachedir + '/covers'
         if not os.path.isdir(self.coverdir):
             os.makedirs(self.coverdir) # we expect OSError to be thrown to caller in case of failure
-        CoverFetcher.__init__(self, sizepref)
+        _CoverFetcher.__init__(self, sizepref)
 
     def get_image(self, imgurl):
         # get basename
@@ -87,14 +87,14 @@ class CachedCoverFetcher(CoverFetcher):
         if os.path.exists(self.imgpath):
             return self.imgpath
 
-        return CoverFetcher.get_image(self, imgurl)
+        return _CoverFetcher.get_image(self, imgurl)
 
-class TmpCoverFetcher(CoverFetcher):
+class TmpCoverFetcher(_CoverFetcher):
     def __init__(self, sizepref=None):
         tmpfile = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
         tmpfile.close()
         self.imgpath = tmpfile.name
-        CoverFetcher.__init__(self, sizepref)
+        _CoverFetcher.__init__(self, sizepref)
 
     def __del__(self):
         if os.path.exists(self.imgpath):
