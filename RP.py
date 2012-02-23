@@ -217,9 +217,10 @@ class Player:
             self.fetcher = TmpCoverFetcher(sizepref)
 
         datahome = os.getenv("XDG_DATA_HOME", "~/.local/share")
-        if not os.path.isdir(datahome + "/RP"):
-            os.makedirs(datahome + "/RP") # we expect OSError to be thrown to caller in case of failure
-        self.logfile = os.path.expanduser(datahome + "/RP/log")
+        datahome = os.path.expanduser(datahome + "/RP")
+        if not os.path.isdir(datahome):
+            os.makedirs(datahome) # we expect OSError to be thrown to caller in case of failure
+        self.logfile = datahome + "/log"
 
     def _now_playing(self, artist, song, imgurl):
         # Log everything that is played
